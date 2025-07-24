@@ -1,29 +1,33 @@
-name: Deploy React App
+name: Deploy
 
 on:
   push:
     branches:
-      - main  # Cambia con il nome del tuo branch principale
+      - main
+      - dev
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Build Docker image
-      run: docker build -t my-react-app .
-
-    - name: Log in to Docker Hub
-      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-    - name: Push Docker image
+    - uses: actions/checkout@v2
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+    
+    - name: Build and push PRD image
+      if: github.ref == 'refs/heads/main'
       run: |
-        docker tag my-react-app ${{ secrets.DOCKER_USERNAME }}/my-react-app:latest
-        docker push ${{ secrets.DOCKER_USERNAME }}/my-react-app:latest
-
-    - name: Deploy to container
+        docker build -t yourdockerhub/centolab-prd:latest .
+        docker push yourdockerhub/centolab-prd:latest
+        ssh ubuntu@51.77.58.125 "docker pull yourdockerhub/centolab-prd:latest && docker-compose -f /path/to/prd/docker-compose.yml up -d"
+    
+    - name: Build and push DEV image
+      if: github.ref == 'refs/heads/dev'
       run: |
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "docker pull ${{ secrets.DOCKER_USERNAME }}/my-react-app:latest && docker stop my-react-app || true && docker rm my-react-app || true && docker run -d -p 80:80 --name my-react-app ${{ secrets.DOCKER_USERNAME }}/my-react-app:latest"
+        docker build -t yourdockerhub/centolab-dev:latest .
+        docker push yourdockerhub/centolab-dev:latest
+        ssh ubuntu@51.77.58.125 "docker pull yourdockerhub/centolab-dev:latest && docker-compose -f /path/to/dev/docker-compose.yml up -d"
